@@ -79,12 +79,19 @@ def main():
         kernels=h["KERNELS"], drop_path=h.get("DROP_PATH", 0.1), dropedge_p=h.get("DROPEDGE_P", 0.2)
     ).to(device)
 
-    for name, param in model.named_parameters():
-        if "crypto_adapter" not in name and "classifier" not in name:
-            param.requires_grad = False
-            
-    optimizer = optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=h["LR"])
-    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.AdamW(model.parameters(), lr=h["LR"])
+    counts = np.zeros(100) 
+    for g in train_graphs: 
+        counts += np.bincount(g.edge_labels.numpy(), minlength=100)
+    # 截断到实际类别数
+    counts = counts[:num_classes]
+    
+    # 2. 核心：反平方根平滑权重（防止数量极少的类权重爆炸）
+    weights_cpu = 1.0 / (np.sqrt(counts) + 1.0)
+    weights_cpu = torch.tensor(weights_cpu / weights_cpu.sum() * num_classes, dtype=torch.float32)
+    
+    # 3. 重新注入 CrossEntropyLoss
+    criterion = nn.CrossEntropyLoss(weight=weights_cpu.to(device))
 
     # 用于保存日志的全局变量
     training_log = []

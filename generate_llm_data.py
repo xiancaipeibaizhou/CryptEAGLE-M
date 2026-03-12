@@ -32,25 +32,19 @@ print(f"[*] Added {num_added_toks} special tokens: <pkt>, <head>, <payload>")
 # 辅助函数：提取五元组 (五元组作为 Flow 的唯一 ID)
 # ==========================================
 def get_flow_id(pkt):
-    """提取双向流的五元组 ID"""
+    """提取双向流的五元组 ID (修复端点对齐 Bug)"""
     if IP in pkt:
-        src_ip = pkt[IP].src
-        dst_ip = pkt[IP].dst
-        proto = pkt[IP].proto
-        
+        src_ip, dst_ip, proto = pkt[IP].src, pkt[IP].dst, pkt[IP].proto
         if TCP in pkt:
-            src_port = pkt[TCP].sport
-            dst_port = pkt[TCP].dport
+            src_port, dst_port = pkt[TCP].sport, pkt[TCP].dport
         elif UDP in pkt:
-            src_port = pkt[UDP].sport
-            dst_port = pkt[UDP].dport
+            src_port, dst_port = pkt[UDP].sport, pkt[UDP].dport
         else:
             src_port, dst_port = 0, 0
             
-        # 排序以合并双向流 (Client->Server 和 Server->Client 归为同一个 Flow)
-        ips = sorted([src_ip, dst_ip])
-        ports = sorted([src_port, dst_port])
-        return f"{ips[0]}:{ports[0]}-{ips[1]}:{ports[1]}-{proto}"
+        # 🌟【修复】：将 IP 和 端口 绑定为元组后再排序，确保真正的双向流唯一标识
+        endpoints = sorted([(src_ip, src_port), (dst_ip, dst_port)])
+        return f"{endpoints[0][0]}:{endpoints[0][1]}-{endpoints[1][0]}:{endpoints[1][1]}-{proto}"
     return None
 
 # ==========================================

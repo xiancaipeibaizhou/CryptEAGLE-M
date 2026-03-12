@@ -35,8 +35,18 @@ def build_graph():
     flow_tokens = data['flow_tokens']
     
     # 2. 加载冻结的 LLM 模型 (特征透镜)
+    # 2. 加载冻结的 LLM 模型 (特征透镜)
     print(f"[*] Loading frozen LLM ({LLM_MODEL_NAME}) as feature lens...")
+    
+    # 🌟【修复】：必须重新加载 Tokenizer 并扩充模型词表，否则特殊 Token 会报错！
+    from transformers import AutoTokenizer
+    tokenizer = AutoTokenizer.from_pretrained(LLM_MODEL_NAME)
+    special_tokens_dict = {'additional_special_tokens': ['<pkt>', '<head>', '<payload>']}
+    tokenizer.add_special_tokens(special_tokens_dict)
+    
     llm = AutoModel.from_pretrained(LLM_MODEL_NAME).to(device)
+    llm.resize_token_embeddings(len(tokenizer)) # 🌟 核心对齐
+    
     llm.eval() # 开启评估模式
     for param in llm.parameters():
         param.requires_grad = False # 彻底冻结底座，防止显存爆炸
@@ -72,13 +82,14 @@ def build_graph():
     edge_index = torch.tensor([src_nodes, dst_nodes], dtype=torch.long)
     edge_attr = torch.stack(edge_features)  # Shape: [num_edges, 768]
     
-    # 节点特征暂用度数/或者简单的零向量替代，因为核心信息在大模型提取的边特征(流载荷)里
     x = torch.zeros((node_counter, 768), dtype=torch.float) 
+    
+    # 🌟【修复】：显式赋予全局唯一节点 ID，彻底解决时序对齐坍塌问题
+    n_id = torch.arange(node_counter, dtype=torch.long)
 
     print(f"[*] Built global graph: {node_counter} nodes, {edge_attr.size(0)} edges.")
 
     # 5. 切分序列图 (适配 CryptEAGLE 的时空双流)
-    # 实际场景中应根据时间戳划分，这里为演示，将大图随机拆分为 SEQ_LEN 个子图
     graphs = []
     chunk_size = max(1, edge_attr.size(0) // SEQ_LEN)
     
@@ -89,7 +100,8 @@ def build_graph():
         sub_edge_index = edge_index[:, start_idx:end_idx]
         sub_edge_attr = edge_attr[start_idx:end_idx]
         
-        data_t = Data(x=x.clone(), edge_index=sub_edge_index, edge_attr=sub_edge_attr)
+        # 🌟【修复】：把全局 n_id 传给所有的子时间步，保证跨时间步的节点身份绝对一致！
+        data_t = Data(x=x.clone(), edge_index=sub_edge_index, edge_attr=sub_edge_attr, n_id=n_id.clone())
         graphs.append(data_t)
 
     # 保存图序列
