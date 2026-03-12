@@ -219,7 +219,8 @@ def plot_and_save_confusion_matrix(cm, target_names, save_path):
 # ==========================================
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', type=str, default='unsw_nb15')
+    # darknet2020_block  unsw_nb15
+    parser.add_argument('--dataset', type=str, default='darknet2020_block')
     parser.add_argument('--data_dir', type=str, default='../processed_data')
     
     # 【修改 2】增加 CryptEAGLE 作为默认选项
@@ -421,3 +422,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

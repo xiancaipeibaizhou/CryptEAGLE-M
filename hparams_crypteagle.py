@@ -13,7 +13,7 @@ def get_default_hparams(dataset="cic_ids2017"):
     if "2017" in dataset:
         return {
             "SEQ_LEN": 3,               # 短窗口捕捉微观爆发
-            "BATCH_SIZE": 1,
+            "BATCH_SIZE": 32,
             "NUM_EPOCHS": 50,
             "LR": 1e-3,
             "HIDDEN": 128,              # 核心特征维度
@@ -38,7 +38,7 @@ def get_default_hparams(dataset="cic_ids2017"):
     elif "nb15" in dataset or "unsw" in dataset:
         return {
             "SEQ_LEN": 10,
-            "BATCH_SIZE": 1,
+            "BATCH_SIZE": 32,
             "NUM_EPOCHS": 60,
             "LR": 5e-4,                 # 学习率略低，防止多步攻击特征被冲刷
             "HIDDEN": 128,
@@ -63,7 +63,7 @@ def get_default_hparams(dataset="cic_ids2017"):
     elif "2020" in dataset or "darknet" in dataset:
         return {
             "SEQ_LEN": 10,              # 长窗口分析持续的加密通信
-            "BATCH_SIZE": 1,
+            "BATCH_SIZE": 32,
             "NUM_EPOCHS": 50,
             "LR": 8e-4,
             "HIDDEN": 128,
@@ -84,7 +84,7 @@ def get_default_hparams(dataset="cic_ids2017"):
     # 默认兜底配置
     else:
         return {
-            "SEQ_LEN": 5, "BATCH_SIZE": 1, "NUM_EPOCHS": 50, "LR": 1e-3,
+            "SEQ_LEN": 5, "BATCH_SIZE": 32, "NUM_EPOCHS": 50, "LR": 1e-3,
             "HIDDEN": 128, "HEADS": 4, "KERNELS": [1, 3, 5], "DROPEDGE_P": 0.1,
             "CL_LOSS_WEIGHT": 0.1, "MAX_CL_EDGES": 4096, "PATIENCE": 10,
             "ACCUM_STEPS": 2, "DROP_PATH": 0.1, "WARMUP_EPOCHS": 5,
