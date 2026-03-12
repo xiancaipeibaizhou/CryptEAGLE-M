@@ -59,8 +59,8 @@ class EarlyStoppingFedAvg(fl.server.strategy.FedAvg):
             if self.patience_counter >= self.patience:
                 print(f"\n🛑 [Server] 触发全局早停机制！连续 {self.patience} 轮未提升。")
                 print(f"🛑 [Server] 联邦网络达到纳什均衡，正在强行终止所有孤岛训练...")
-                # 强行终止 Server 进程，这会导致底下的 Clients 自动断开连接并进入保存测试流程
-                sys.exit(0)
+                # 🌟 使用操作系统级强杀，瞬间干掉所有 gRPC 挂起线程
+                os._exit(0)
         
         if aggregated_metrics is None:
             aggregated_metrics = {}

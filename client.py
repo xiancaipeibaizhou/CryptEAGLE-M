@@ -158,7 +158,10 @@ def main():
 
     # 5. 启动联邦学习，阻塞直到 10 轮结束
     print(f"[*] [Client {args.cid}] 连接服务器，开始联邦学习...")
-    fl.client.start_numpy_client(server_address="127.0.0.1:8080", client=CryptEAGLEClient())
+    try:
+        fl.client.start_numpy_client(server_address="127.0.0.1:8080", client=CryptEAGLEClient())
+    except Exception as e:
+        print(f"\n[*] [Client {args.cid}] 收到 Server 终止信号 (联邦早停触发)，断开连接。")
 
     # ========================================================
     # 🌟 6. 联邦学习结束！加载最好的模型进行测试并彻底保存指标 🌟
