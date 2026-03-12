@@ -142,15 +142,16 @@ class CryptoNormEdgeAttention(MessagePassing):
         out = self.norm(out + self.drop_path(residual), batch)
         return self.act(out)
 
-    def message(self, q_i, k_j, v_j, e_emb, index):
+    # 1. 函数参数里加一个 size_i，PyG 会自动把当前图的节点总数 N 传进来
+    def message(self, q_i, k_j, v_j, e_emb, index, size_i):
         score = (q_i * (k_j + e_emb)).sum(dim=-1) / (self.head_dim ** 0.5)
-
+        
         # 【KBS 创新点 3】：CryptoNorm Attention Kernel 核心数学实现
-        # α_ij = ReLU(q_i · k_j) / Σ_k ReLU(q_i · k_k)
         score = F.relu(score)
-        row_sum = scatter(score, index, dim=0, dim_size=q_i.size(0), reduce='sum')
-        alpha = score / (row_sum[index] + 1e-6)
-
+        # 2. 将 dim_size=q_i.size(0) 改为 dim_size=size_i，彻底防止显存越界
+        row_sum = scatter(score, index, dim=0, dim_size=size_i, reduce='sum')
+        alpha = score / (row_sum[index] + 1e-6) 
+        
         alpha = F.dropout(alpha, p=self.dropout, training=self.training)
         return alpha.unsqueeze(-1) * (v_j + e_emb)
 
