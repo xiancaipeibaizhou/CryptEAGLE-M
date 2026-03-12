@@ -5,7 +5,6 @@ from collections import OrderedDict
 from functools import partial
 from typing import Any, Callable
 
-# 注意这里：已经修改为直接从同级目录的 approx_module 导入
 from approx_module import LinAtten
 from torchvision.ops.misc import MLP
 
@@ -20,17 +19,6 @@ class MLPBlock(MLP):
                 if m.bias is not None:
                     nn.init.normal_(m.bias, std=1e-6)
 
-    def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs):
-        version = local_metadata.get("version", None)
-        if version is None or version < 2:
-            for i in range(2):
-                for type in ["weight", "bias"]:
-                    old_key = f"{prefix}linear_{i+1}.{type}"
-                    new_key = f"{prefix}{3*i}.{type}"
-                    if old_key in state_dict:
-                        state_dict[new_key] = state_dict.pop(old_key)
-        super()._load_from_state_dict(state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs)
-
 class EncoderBlock(nn.Module):
     """Transformer encoder block with LinAtten."""
     def __init__(
@@ -41,18 +29,17 @@ class EncoderBlock(nn.Module):
         dropout: float,
         attention_dropout: float,
         norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
+        seq_len: int = 10, # 【修复点 1】：接收动态传入的 seq_len
     ):
         super().__init__()
         self.num_heads = num_heads
         self.ln_1 = norm_layer(hidden_dim)
-        # 序列长度 seq_len 默认给一个小值，因为我们的输入维度已经被池化了
-        self.self_attention = LinAtten(dim=hidden_dim, num_heads=num_heads, attn_drop=dropout, proj_drop=dropout, seq_len=10)
+        # 【修复点 2】：把写死的 10 改为动态的 seq_len
+        self.self_attention = LinAtten(dim=hidden_dim, num_heads=num_heads, attn_drop=dropout, proj_drop=dropout, seq_len=seq_len)
         self.ln_2 = norm_layer(hidden_dim)
-        # MPC-friendly MLP
         self.mlp = MLPBlock(hidden_dim, mlp_dim, dropout, act_layer=nn.ReLU)
 
     def forward(self, input: torch.Tensor):
-        torch._assert(input.dim() == 3, f"Expected (batch_size, seq_length, hidden_dim) got {input.shape}")
         x = self.ln_1(input)
         x = self.self_attention(x)
         x = x + input
@@ -70,7 +57,8 @@ class CryptPEFT_adapter(nn.Module):
                  dropout=0.0,
                  adapter_scaler="1.0",
                  mlp_dim=None,
-                 num_blk=1,):
+                 num_blk=1,
+                 seq_len=10): # 【修复点 3】：让 Adapter 接收 seq_len
         super().__init__()
         self.n_embd = d_model
         self.down_size = bottleneck
@@ -82,7 +70,15 @@ class CryptPEFT_adapter(nn.Module):
         
         blks: OrderedDict[str, nn.Module] = OrderedDict()
         for i in range(num_blk):
-            blks[f"blk_{i}"] = EncoderBlock(num_heads=num_heads, hidden_dim=self.down_size, mlp_dim=mlp_dim, dropout=dropout, attention_dropout=attention_dropout, norm_layer=norm_layer)
+            blks[f"blk_{i}"] = EncoderBlock(
+                num_heads=num_heads, 
+                hidden_dim=self.down_size, 
+                mlp_dim=mlp_dim, 
+                dropout=dropout, 
+                attention_dropout=attention_dropout, 
+                norm_layer=norm_layer,
+                seq_len=seq_len # 【修复点 4】：传递给 EncoderBlock
+            )
         
         self.blks = nn.Sequential(blks) 
 

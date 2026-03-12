@@ -298,7 +298,8 @@ class CryptEAGLE(nn.Module):
             d_model=hidden,
             bottleneck=hidden // 4,
             dropout=dropout,
-            mlp_dim=hidden * 2
+            mlp_dim=hidden * 2,
+            seq_len=self.seq_len
         )
 
         self.gating = EntropyGatingUnit(hidden)
